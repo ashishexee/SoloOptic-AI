@@ -89,7 +89,8 @@ export async function fuzzContract(
         } else {
           txResp = await (contractWithSigner as any)[name](...args, overrides);
         }
-        const receipt = await txResp.wait();
+        // Wait up to 10 seconds for 1 confirmation
+        const receipt = await txResp.wait(1, 10000);
 
         if (!receipt) {
           console.warn(`No receipt: ${name} iter ${i}`);

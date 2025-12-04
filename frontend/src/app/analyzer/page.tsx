@@ -525,9 +525,21 @@ export default function AnalyzerPage() {
                     ))}
                   </div>
 
-                  <Button onClick={handleOptimize} className="w-full h-12 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold text-lg shadow-xl shadow-purple-500/20">
-                    <Zap className="w-5 h-5 mr-2" /> Apply Optimizations & Re-Analyze
-                  </Button>
+                  {heatmapData?.pendingOptimizedCode ? (
+                    <Button onClick={handleOptimize} className="w-full h-12 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold text-lg shadow-xl shadow-purple-500/20">
+                      <Zap className="w-5 h-5 mr-2" /> Apply Optimizations & Re-Analyze
+                    </Button>
+                  ) : (
+                    <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20 text-center">
+                      <p className="text-green-400 font-medium flex items-center justify-center">
+                        <CheckCircle2 className="w-5 h-5 mr-2" />
+                        Code is already fully optimized!
+                      </p>
+                      <p className="text-sm text-gray-400 mt-1">
+                        The AI found no further gas optimizations for this contract.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -542,26 +554,30 @@ export default function AnalyzerPage() {
                   </h3>
                   
                   <div className="mb-8">
+                    <div className="p-6 rounded-xl bg-green-500/10 border border-green-500/20 text-center mb-8">
+                      <p className="text-green-400 font-medium mb-2">Total Gas Saved</p>
+                      <p className="text-4xl font-bold text-white mb-1">
+                        {((originalStats.total - optimizedStats.total) / originalStats.total * 100).toFixed(1)}%
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        {originalStats.total.toLocaleString()} → {optimizedStats.total.toLocaleString()} gas
+                      </p>
+                    </div>
+
+                    {functionStats.length > 0 && (
+                      <div className="mb-8">
+                         <h4 className="text-sm text-gray-400 uppercase tracking-wider mb-4">Optimized Gas Usage</h4>
+                         <GasChart data={functionStats} />
+                      </div>
+                    )}
+
                     <h4 className="text-sm text-gray-400 uppercase tracking-wider mb-4">Performance Comparison</h4>
                     <StatsDisplay originalStats={originalStats} optimizedStats={optimizedStats} />
                   </div>
-
-                  {functionStats.length > 0 && (
-                    <div className="mb-8">
-                       <h4 className="text-sm text-gray-400 uppercase tracking-wider mb-4">Optimized Gas Usage</h4>
-                       <GasChart data={functionStats} />
-                    </div>
-                  )}
-
-                  <div className="p-6 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
-                    <p className="text-green-400 font-medium mb-2">Total Gas Saved</p>
-                    <p className="text-4xl font-bold text-white mb-1">
-                      {((originalStats.total - optimizedStats.total) / originalStats.total * 100).toFixed(1)}%
-                    </p>
                     <p className="text-sm text-gray-400">
                       {(originalStats.total - optimizedStats.total).toLocaleString()} gas units
                     </p>
-                  </div>
+
 
                   {/* Optimized Code Display */}
                   <div className="mt-6">

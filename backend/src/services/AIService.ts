@@ -80,6 +80,11 @@ Rules:
    - Use 'calldata' instead of 'memory' for read-only reference arguments in external functions.
    - Cache storage variables in stack variables (memory) when read multiple times.
 6. Do not include markdown formatting (like \`\`\`json) in the response, just the raw JSON string.
+7. CRITICAL OPTIMIZATION: You MUST replace all \`require(condition, "string")\` statements with custom errors:
+   - Define \`error CustomError();\` at the contract level.
+   - Use \`if (!condition) revert CustomError();\`.
+   - This saves significant gas on deployment and runtime.
+8. If the code is already fully optimized, return the original code exactly.
 `;
 
   const model = genAI.getGenerativeModel({
@@ -156,8 +161,10 @@ Generate optimizations.
       if (parsed.optimizedCode) {
         console.log("[getOptimizationSuggestions] Optimized code length:", parsed.optimizedCode.length);
         console.log("[getOptimizationSuggestions] Original code length:", code.length);
-        if (parsed.optimizedCode === code) {
+        const normalize = (str: string) => str.replace(/\s+/g, '');
+        if (normalize(parsed.optimizedCode) === normalize(code)) {
           console.warn("[getOptimizationSuggestions] WARNING: Optimized code is IDENTICAL to original code!");
+          parsed.optimizedCode = null; // Signal to frontend that no changes were made
         } else {
           console.log("[getOptimizationSuggestions] Code changed! Diff length:", Math.abs(parsed.optimizedCode.length - code.length));
         }

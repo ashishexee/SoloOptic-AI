@@ -552,6 +552,14 @@ export default function AnalyzerPage() {
                     <CheckCircle2 className="w-5 h-5 mr-2 text-green-400" />
                     Optimization Complete
                   </h3>
+
+                  {/* Optimized Code Display */}
+                  <div className="mb-8">
+                    <h4 className="text-sm text-gray-400 uppercase tracking-wider mb-4">Optimized Contract</h4>
+                    <div className="bg-black/50 border border-white/10 rounded-lg p-4 font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar">
+                      {heatmapData?.optimizedCode}
+                    </div>
+                  </div>
                   
                   <div className="mb-8">
                     <div className="p-6 rounded-xl bg-green-500/10 border border-green-500/20 text-center mb-8">
@@ -579,13 +587,7 @@ export default function AnalyzerPage() {
                     </p>
 
 
-                  {/* Optimized Code Display */}
-                  <div className="mt-6">
-                    <h4 className="text-sm text-gray-400 uppercase tracking-wider mb-4">Optimized Contract</h4>
-                    <div className="bg-black/50 border border-white/10 rounded-lg p-4 font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar">
-                      {heatmapData?.optimizedCode}
-                    </div>
-                  </div>
+
                 </div>
               </div>
             )}

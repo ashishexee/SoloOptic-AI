@@ -61,7 +61,7 @@ async function main() {
     }
 
     console.log("\n2. Getting AI Optimization Suggestions...");
-    const suggestions = await getOptimizationSuggestions(complexCode, fuzzReport, "gemini-2.0-flash");
+    const suggestions = await getOptimizationSuggestions(complexCode, fuzzReport, "gemini-2.0-flash","");
     
     console.log("\n--- AI SUGGESTIONS ---");
     console.log(suggestions);

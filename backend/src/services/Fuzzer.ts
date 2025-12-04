@@ -46,10 +46,7 @@ export async function fuzzContract(
   }
 
   const callables = compiled.abi.filter(
-    (item: any) =>
-      item.type === "function" &&
-      item.stateMutability !== "view" &&
-      item.stateMutability !== "pure"
+    (item: any) => item.type === "function"
   );
 
   const results = [];
@@ -70,21 +67,28 @@ export async function fuzzContract(
 
         // Smart Inputs: Handle payable functions
         if (fn.stateMutability === "payable") {
-             overrides.value = ethers.parseEther((Math.random() * 1).toFixed(4)); // Random 0-1 ETH
+          overrides.value = ethers.parseEther((Math.random() * 1).toFixed(4)); // Random 0-1 ETH
         }
 
         // Smart Inputs: Handle withdraw to avoid INSUFFICIENT balance
         // We can't easily know the exact balance, but we can try small amounts
         if (name.toLowerCase().includes("withdraw")) {
-            // If the first argument is a uint, make it small
-             if (fn.inputs && fn.inputs.length > 0 && fn.inputs[0].type.includes("uint")) {
-                 args[0] = Math.floor(Math.random() * 1000); // Small amount (wei)
-             }
+          // If the first argument is a uint, make it small
+          if (fn.inputs && fn.inputs.length > 0 && fn.inputs[0].type.includes("uint")) {
+            args[0] = Math.floor(Math.random() * 1000); // Small amount (wei)
+          }
         }
 
         // Execute transaction
         // console.log(`[Fuzzer] Calling ${name} with args:`, args, overrides);
-        const txResp = await (contractWithSigner as any)[name](...args, overrides);
+        let txResp;
+        if (fn.stateMutability === "view" || fn.stateMutability === "pure") {
+          // Force transaction for view/pure functions to get a trace
+          const txRequest = await contractWithSigner[name].populateTransaction(...args, overrides);
+          txResp = await signer.sendTransaction(txRequest);
+        } else {
+          txResp = await (contractWithSigner as any)[name](...args, overrides);
+        }
         const receipt = await txResp.wait();
 
         if (!receipt) {
@@ -131,9 +135,9 @@ export async function fuzzContract(
 
     // Even if we have 0 samples, we push the result so the AI knows we tried
     if (samples.length > 0) {
-        samples.sort((a, b) => a - b);
+      samples.sort((a, b) => a - b);
     }
-    
+
     const min = samples[0] ?? 0;
     const max = samples[samples.length - 1] ?? 0;
     const avg = samples.length

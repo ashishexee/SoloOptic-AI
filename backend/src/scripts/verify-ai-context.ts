@@ -39,7 +39,7 @@ async function main() {
     // To be sure, we could temporarily add a console.log(prompt) in AIService.ts, but let's see if it runs first.
     
     console.log("Calling getOptimizationSuggestions...");
-    const response = await getOptimizationSuggestions(mockCode, mockGasReport, "gemini-2.0-flash");
+    const response = await getOptimizationSuggestions(mockCode, mockGasReport, "gemini-2.0-flash","");
     console.log("vvvvvvvvvv RESPONSE vvvvvvvvvv");
     console.log(response);
     console.log("^^^^^^^^^^ RESPONSE ^^^^^^^^^^");

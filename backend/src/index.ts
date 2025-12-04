@@ -1,7 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config({ override: true });
 
-// 🔥 DEBUG: Log dotenv status immediately after loading
 console.log("[Index] dotenv/config loaded");
 console.log("[Index] process.env.GEMINI_API_KEY:", process.env.GEMINI_API_KEY ? "✓ set" : "✗ NOT SET");
 console.log("[Index] process.env.RPC_URL:", process.env.RPC_URL ? "✓ set" : "✗ NOT SET");
@@ -9,6 +8,7 @@ console.log("[Index] All env vars keys:", Object.keys(process.env).filter(k => !
 
 import express from "express";
 import bodyParser from "body-parser";
+import cors from "cors";
 import { compileContract } from "./services/CompilerService";
 import { fuzzContract } from "./services/Fuzzer";
 import { profileTrace } from "./services/GasProfiler";
@@ -17,6 +17,7 @@ import { heatmapRouter } from "./routes/heatmap";
 import { getOptimizationSuggestions } from "./services/AIService";
 
 const app = express();
+app.use(cors());
 app.use(bodyParser.json({ limit: "5mb" }));
 
 app.get("/", (_req, res) => res.send("SolOptic AI backend"));
@@ -53,7 +54,7 @@ app.post("/fuzz", async (req, res) => {
     const { code, runsPerFunction } = req.body;
     if (!code) return res.status(400).json({ error: "Missing code" });
 
-    const report = await fuzzContract(code, runsPerFunction);
+    const report = await fuzzContract(code, process.env.RPC_URL || "http://127.0.0.1:8545", runsPerFunction);
     res.json(report);
   } catch (err: any) {
     console.error("Fuzz error", err);
@@ -94,18 +95,19 @@ app.use("/heatmap", heatmapRouter);
  */
 app.post("/optimize", async (req, res) => {
   try {
-    const { code, model, rpcUrl } = req.body;
+    const { code, model, rpcUrl ,  api_key} = req.body;
     if (!code) return res.status(400).json({ error: "Missing code" });
 
     // 1. Run fuzzing to get gas stats
     // We use a small number of runs to be fast, or default
-    const fuzzReport = await fuzzContract(code, rpcUrl, 20);
+    const fuzzReport = await fuzzContract(code, rpcUrl || process.env.RPC_URL || "http://127.0.0.1:8545", 20);
 
     // 2. Call AI Service
-    const suggestions = await getOptimizationSuggestions(code, fuzzReport, model);
+    const aiResult = await getOptimizationSuggestions(code, fuzzReport, model, api_key);
 
     res.json({
-      suggestions,
+      suggestions: aiResult.suggestions,
+      optimizedCode: aiResult.optimizedCode,
       gasReport: fuzzReport
     });
   } catch (err: any) {
@@ -114,7 +116,7 @@ app.post("/optimize", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`SolOptic backend (Phase 1) running on port ${PORT}`);
 });

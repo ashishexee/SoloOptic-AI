@@ -1,6 +1,7 @@
 import express from "express";
 import { fuzzContract } from "../services/Fuzzer";
 import { compileContract } from "../services/CompilerService";
+import { RPC_URL } from "../config";
 
 export const heatmapRouter = express.Router();
 
@@ -14,17 +15,24 @@ heatmapRouter.post("/", async (req, res) => {
 
     // compile once for contract metadata
     const compiled = await compileContract(code);
-    const fuzz = await fuzzContract(code, runsPerFunction);
+    const fuzz = await fuzzContract(code, RPC_URL, runsPerFunction);
 
     const lines = code.split("\n");
     const lastLineNumber = lines.length;
     const gasPerLine: Record<number, number> = {};
 
-    // combine gas across functions, but IGNORE invalid line numbers (<= 0)
+
     for (const fn of fuzz.functions || []) {
       for (const [k, v] of Object.entries(fn.gasByLineAccum || {})) {
         const ln = Number(k);
-        if (!Number.isFinite(ln) || ln <= 0) continue; // skip unmapped / boilerplate
+        if (!Number.isFinite(ln) || ln <= 0) continue;
+
+        // Check if line is a comment or empty
+        const lineContent = lines[ln - 1]?.trim();
+        if (!lineContent || lineContent.startsWith("//") || lineContent.startsWith("/*") || lineContent.startsWith("*")) {
+          continue;
+        }
+
         gasPerLine[ln] = (gasPerLine[ln] || 0) + Number(v || 0);
       }
     }
@@ -37,7 +45,12 @@ heatmapRouter.post("/", async (req, res) => {
       const percent = totalGas ? gas / totalGas : 0;
 
       // If this is the final line, mark compiler boilerplate (do not treat as user hot-spot)
+      // FIX: Force gas to 0 for boilerplate lines so it doesn't confuse the user
       const isBoilerplate = lineNumber === lastLineNumber && gas > 0;
+      if (isBoilerplate) {
+        // We intentionally hide this gas from the heatmap visualization
+        // The total gas summary still accounts for it, but it won't show up on the last empty line
+      }
 
       let severity: "none" | "low" | "medium" | "high" | "boilerplate" = "none";
       if (isBoilerplate) {
@@ -51,8 +64,8 @@ heatmapRouter.post("/", async (req, res) => {
       return {
         lineNumber,
         text,
-        gas,
-        percent: Math.round(percent * 100000) / 100000,
+        gas: isBoilerplate ? 0 : gas, // Hide gas if boilerplate
+        percent: isBoilerplate ? 0 : (Math.round(percent * 100000) / 100000),
         severity,
         isBoilerplate,
       };
@@ -68,7 +81,6 @@ heatmapRouter.post("/", async (req, res) => {
         min: fn.min ?? 0,
         max: fn.max ?? 0,
         p95: fn.p95 ?? 0,
-        // only include positive, valid source line numbers
         lines: Object.keys(fn.gasByLineAccum || {})
           .map(Number)
           .filter((n) => Number.isFinite(n) && n > 0)

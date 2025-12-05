@@ -521,8 +521,15 @@ Generate optimizations.
     const text = await response.text();
 
     console.log("[getOptimizationSuggestions] ✓ Response received (length):", text?.length ?? 0);
+
+    // Cleanup: remove markdown code blocks if present (even with responseMimeType, some models add them)
+    let cleanText = text.trim();
+    if (cleanText.startsWith("```")) {
+      cleanText = cleanText.replace(/^```(json)?\s*/, "").replace(/\s*```$/, "");
+    }
+
     try {
-      const parsed = JSON.parse(text);
+      const parsed = JSON.parse(cleanText);
       if (parsed.optimizedCode) {
         console.log("[getOptimizationSuggestions] Optimized code length:", parsed.optimizedCode.length);
         console.log("[getOptimizationSuggestions] Original code length:", code.length);

@@ -13,7 +13,8 @@ import {
   Settings2,
   AlertCircle,
   CheckCircle2,
-  Key
+  Key,
+  Copy
 } from 'lucide-react'
 import GasHeatmap from '@/components/GasHeatmap'
 import { AnalysisConsole, LogEntry } from '@/components/AnalysisConsole'
@@ -600,7 +601,19 @@ export default function AnalyzerPage() {
 
                   {/* Optimized Code Display */}
                   <div className="mb-8">
-                    <h4 className="text-sm text-gray-400 uppercase tracking-wider mb-4">Optimized Contract</h4>
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-sm text-gray-400 uppercase tracking-wider">Optimized Contract</h4>
+                      <Button
+                        onClick={() => {
+                          navigator.clipboard.writeText(heatmapData?.optimizedCode || '')
+                        }}
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-xs text-gray-400 hover:text-white"
+                      >
+                        <Copy className="w-3 h-3 mr-1" /> Copy
+                      </Button>
+                    </div>
                     <div className="bg-black/50 border border-white/10 rounded-lg p-4 font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar">
                       {heatmapData?.optimizedCode}
                     </div>

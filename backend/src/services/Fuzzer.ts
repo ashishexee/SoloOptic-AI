@@ -138,11 +138,16 @@ export async function fuzzContract(
         } catch (traceErr) {
           // If tracing fails (e.g. Anvil not running with --steps-tracing, or revert with no trace),
           // we just skip the heatmap part for this iteration, but we KEPT the gas sample above.
-          console.warn(`[Fuzzer] Trace failed for ${name} iter ${i}, line profile skipped.`);
+          // console.warn(`[Fuzzer] Trace failed for ${name} iter ${i}, line profile skipped.`);
         }
       } catch (err: any) {
         // Ethers might throw on revert, but often attaches the receipt
-        const receipt = err.receipt || (err.data && err.data.receipt);
+        const receipt = err.receipt || (err.data && err.data.receipt) || (err.info && err.info.receipt);
+
+        if (!receipt) {
+          console.log(`[Fuzzer] Error keys: [${Object.keys(err).join(', ')}]`);
+          if (err.info) console.log(`[Fuzzer] Error info keys: [${Object.keys(err.info).join(', ')}]`);
+        }
 
         if (receipt && receipt.gasUsed) {
           const gasUsed = safeNumber(receipt.gasUsed, 0);
@@ -151,7 +156,7 @@ export async function fuzzContract(
             console.log(`[Fuzzer] ${name}() iter ${i}: REVERT (caught), gas=${gasUsed}`);
           }
         } else {
-          console.warn(`[Fuzzer] Fuzz failed ${name} iter ${i}: ${err?.message}`);
+          // console.warn(`[Fuzzer] Fuzz failed ${name} iter ${i}: ${err?.message}`);
         }
       }
     }

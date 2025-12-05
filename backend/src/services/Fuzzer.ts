@@ -10,9 +10,10 @@ import { ethers } from "ethers";
 export async function fuzzContract(
   userSource: string,
   rpcUrl: string,
-  runsPerFunction?: number
+  runsPerFunction?: number,
+  preCompiled?: any
 ) {
-  const compiled = await compileContract(userSource);
+  const compiled = preCompiled || await compileContract(userSource);
   const runs = runsPerFunction ?? FUZZ_DEFAULT_RUNS;
 
   const contract = await deployContract(compiled.bytecode, compiled.abi, rpcUrl);
@@ -63,7 +64,9 @@ export async function fuzzContract(
           senderAddress,
         });
 
-        const overrides: any = {};
+        const overrides: any = {
+          gasLimit: 10000000
+        };
 
         // Smart Inputs: Handle payable functions
         if (fn.stateMutability === "payable") {
@@ -97,40 +100,59 @@ export async function fuzzContract(
           continue;
         }
 
-        // Skip reverted txs for gas stats, but don't crash
+        // Continue even if reverted to capture gas usage of the failure
         if (receipt.status === 0) {
-          console.log(`[Fuzzer] ${name}() iter ${i}: REVERTED (skipping gas stats)`);
-          continue;
+          console.log(`[Fuzzer] ${name}() iter ${i}: REVERTED (processing trace anyway)`);
+        }
+
+        // Capture gas usage for high-level stats immediately
+        const gasUsed = safeNumber(receipt.gasUsed, 0);
+        if (gasUsed > 0) {
+          samples.push(gasUsed);
         }
 
         console.log(
-          `[Fuzzer] ${name}() iter ${i}: gas=${receipt.gasUsed}, status=✓`
+          `[Fuzzer] ${name}() iter ${i}: gas=${gasUsed}, status=${receipt.status === 1 ? '✓' : '✗'}`
         );
 
-        // Wait a bit for trace to be ready (Anvil quirk)
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        // Attempt tracing for heatmap (optional)
+        try {
+          // Wait a bit for trace to be ready (Anvil quirk)
+          await new Promise((resolve) => setTimeout(resolve, 50));
 
-        const trace = await traceTransaction(receipt.hash, rpcUrl);
-        const profile = profileTrace(
-          trace,
-          compiled.runtimeSourceMap,
-          compiled.deployedBytecode,
-          userSource
-        );
+          const trace = await traceTransaction(receipt.hash, rpcUrl);
+          const profile = profileTrace(
+            trace,
+            compiled.runtimeSourceMap,
+            compiled.deployedBytecode,
+            userSource
+          );
 
-        samples.push(safeNumber(receipt.gasUsed || profile.totalGasCost, 0));
-
-        // Accumulate valid lines
-        for (const [lineStr, gas] of Object.entries(profile.gasByLine)) {
-          const lnum = Number(lineStr);
-          if (lnum > 0) {
-            gasByLineAccum[lnum] = (gasByLineAccum[lnum] || 0) + Number(gas);
+          // Accumulate valid lines
+          for (const [lineStr, gas] of Object.entries(profile.gasByLine)) {
+            const lnum = Number(lineStr);
+            if (lnum > 0) {
+              gasByLineAccum[lnum] = (gasByLineAccum[lnum] || 0) + Number(gas);
+            }
           }
+        } catch (traceErr) {
+          // If tracing fails (e.g. Anvil not running with --steps-tracing, or revert with no trace),
+          // we just skip the heatmap part for this iteration, but we KEPT the gas sample above.
+          console.warn(`[Fuzzer] Trace failed for ${name} iter ${i}, line profile skipped.`);
         }
       } catch (err: any) {
-        // Log but continue - DO NOT CRASH
-        // Common errors: "execution reverted", "insufficient funds", etc.
-        // console.warn(`Fuzz failed ${name} iter ${i}: ${err?.message}`);
+        // Ethers might throw on revert, but often attaches the receipt
+        const receipt = err.receipt || (err.data && err.data.receipt);
+
+        if (receipt && receipt.gasUsed) {
+          const gasUsed = safeNumber(receipt.gasUsed, 0);
+          if (gasUsed > 0) {
+            samples.push(gasUsed);
+            console.log(`[Fuzzer] ${name}() iter ${i}: REVERT (caught), gas=${gasUsed}`);
+          }
+        } else {
+          console.warn(`[Fuzzer] Fuzz failed ${name} iter ${i}: ${err?.message}`);
+        }
       }
     }
 

@@ -15,7 +15,7 @@ heatmapRouter.post("/", async (req, res) => {
 
     // compile once for contract metadata
     const compiled = await compileContract(code);
-    const fuzz = await fuzzContract(code, RPC_URL, runsPerFunction);
+    const fuzz = await fuzzContract(code, RPC_URL, runsPerFunction, compiled);
 
     const lines = code.split("\n");
     const lastLineNumber = lines.length;

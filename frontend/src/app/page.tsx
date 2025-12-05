@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CodeEditor } from '@/components/CodeEditor'
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react'
 
 export default function Home() {
+  const router = useRouter()
   const [showDemo, setShowDemo] = useState(false)
   const [activeLine, setActiveLine] = useState(0)
   const [isMounted, setIsMounted] = useState(false)
@@ -28,7 +30,7 @@ export default function Home() {
   }, [])
 
   const scrollToApp = () => {
-    window.location.href = '/analyzer'
+    router.push('/analyzer')
   }
 
   const editorLines = [
@@ -71,7 +73,7 @@ export default function Home() {
             <Button 
               variant="outline" 
               className="border-white/10 hover:bg-white/5 text-white hover:text-white transition-all"
-              onClick={() => window.location.href = '/analyzer'}
+              onClick={() => router.push('/analyzer')}
             >
               Launch App
             </Button>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { 
   ArrowLeft, 
@@ -44,6 +45,7 @@ interface AIInsight {
 }
 
 export default function AnalyzerPage() {
+  const router = useRouter()
   // UI State
   const [state, setState] = useState<AnalyzerState>('IDLE')
   const [leftPanelWidth, setLeftPanelWidth] = useState(50)
@@ -53,6 +55,7 @@ export default function AnalyzerPage() {
   const [code, setCode] = useState('')
   const [fuzzRuns, setFuzzRuns] = useState(200)
   const [apiKey, setApiKey] = useState('')
+  const [backendUrl, setBackendUrl] = useState('http://localhost:3001')
   const [logs, setLogs] = useState<LogEntry[]>([])
   
   // Results State
@@ -85,12 +88,18 @@ export default function AnalyzerPage() {
     setFunctionStats([])
     setHeatmapData(null)
     
+    // Normalize URL
+    const baseUrl = backendUrl.replace(/\/$/, '')
+    
     try {
       // Compile
       addLog('Compiling contract...', 'process')
-      const compileRes = await fetch('http://localhost:3001/compile', {
+      const compileRes = await fetch(`${baseUrl}/compile`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: JSON.stringify({ code })
       })
       if (!compileRes.ok) throw new Error((await compileRes.json()).error)
@@ -99,9 +108,12 @@ export default function AnalyzerPage() {
 
       // Fuzz
       addLog(`Starting fuzzing (${fuzzRuns} runs per function)...`, 'process')
-      const heatmapRes = await fetch('http://localhost:3001/heatmap', {
+      const heatmapRes = await fetch(`${baseUrl}/heatmap`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: JSON.stringify({ code, runsPerFunction: fuzzRuns })
       })
       if (!heatmapRes.ok) throw new Error((await heatmapRes.json()).error)
@@ -180,10 +192,16 @@ export default function AnalyzerPage() {
     setState('FETCHING_AI')
     addLog('Analyzing gas patterns for optimizations...', 'process')
     
+    // Normalize URL
+    const baseUrl = backendUrl.replace(/\/$/, '')
+
     try {
-      const res = await fetch('http://localhost:3001/optimize', {
+      const res = await fetch(`${baseUrl}/optimize`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: JSON.stringify({ code, api_key: apiKey })
       })
       if (!res.ok) throw new Error((await res.json()).error)
@@ -217,20 +235,29 @@ export default function AnalyzerPage() {
     try {
       const optimizedCode = heatmapData?.pendingOptimizedCode
       if (!optimizedCode) throw new Error("No optimized code found")
+      
+      // Normalize URL
+      const baseUrl = backendUrl.replace(/\/$/, '')
 
       // Re-compile and Re-fuzz the OPTIMIZED code
       addLog('Compiling optimized contract...', 'process')
-      const compileRes = await fetch('http://localhost:3001/compile', {
+      const compileRes = await fetch(`${baseUrl}/compile`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: JSON.stringify({ code: optimizedCode })
       })
       if (!compileRes.ok) throw new Error((await compileRes.json()).error)
 
       addLog('Fuzzing optimized contract...', 'process')
-      const heatmapRes = await fetch('http://localhost:3001/heatmap', {
+      const heatmapRes = await fetch(`${baseUrl}/heatmap`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: JSON.stringify({ code: optimizedCode, runsPerFunction: fuzzRuns })
       })
       if (!heatmapRes.ok) throw new Error((await heatmapRes.json()).error)
@@ -324,6 +351,10 @@ export default function AnalyzerPage() {
   useEffect(() => {
     const storedKey = localStorage.getItem('soloptic_api_key')
     if (storedKey) setApiKey(storedKey)
+    
+    // Also load backend URL if previously saved
+    const storedBackend = localStorage.getItem('soloptic_backend_url')
+    if (storedBackend) setBackendUrl(storedBackend)
   }, [])
 
   const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -332,7 +363,13 @@ export default function AnalyzerPage() {
     localStorage.setItem('soloptic_api_key', val)
   }
 
-  const handleBack = () => window.location.href = '/'
+  const handleBackendUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    setBackendUrl(val)
+    localStorage.setItem('soloptic_backend_url', val)
+  }
+
+  const handleBack = () => router.push('/')
 
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden selection:bg-purple-500/30">
@@ -353,9 +390,15 @@ export default function AnalyzerPage() {
               SolOptic AI
             </span>
           </div>
-          <Button onClick={handleBack} variant="ghost" className="text-gray-400 hover:text-white hover:bg-white/5">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Home
-          </Button>
+          <div className="flex items-center space-x-4">
+             <div className="hidden md:flex items-center space-x-2">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span className="text-xs text-green-400 uppercase tracking-wider">System Online</span>
+             </div>
+             <Button onClick={handleBack} variant="ghost" className="text-gray-400 hover:text-white hover:bg-white/5">
+                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Home
+             </Button>
+          </div>
         </div>
       </nav>
 
@@ -364,7 +407,7 @@ export default function AnalyzerPage() {
         {/* Anvil Banner */}
         <div className="bg-purple-900/20 border-b border-purple-500/20 px-6 py-2 flex items-center justify-center text-xs text-purple-200">
           <AlertCircle className="w-3 h-3 mr-2" />
-          <span>Requirement: Run local Anvil node:</span>
+          <span>Requirement: Run local Anvil node or use deployed backend</span>
           <code className="mx-2 bg-black/50 px-2 py-0.5 rounded font-mono text-purple-100">anvil --port 8545 --steps-tracing</code>
         </div>
 
@@ -401,30 +444,32 @@ export default function AnalyzerPage() {
                 </div>
 
                 {/* Action Bar (Only visible in IDLE or RESULTS to allow re-run) */}
-                <div className="p-4 border-t border-white/5 bg-white/5 shrink-0 flex items-center space-x-4">
+                <div className="p-4 border-t border-white/5 bg-white/5 shrink-0 flex flex-wrap items-center gap-4">
+                  
                   <div className="flex items-center space-x-2 bg-black/30 px-3 py-2 rounded-lg border border-white/5">
                     <Settings2 className="w-4 h-4 text-gray-400" />
-                    <span className="text-xs text-gray-400">Fuzz Runs:</span>
+                    <span className="text-xs text-gray-400 whitespace-nowrap">Runs:</span>
                     <input 
                       type="number" 
                       value={fuzzRuns}
                       onChange={(e) => setFuzzRuns(Number(e.target.value))}
-                      className="w-16 bg-transparent text-xs text-white focus:outline-none text-right font-mono"
+                      className="w-12 bg-transparent text-xs text-white focus:outline-none text-right font-mono"
                       min={10} max={1000}
                     />
                   </div>
 
-                  <div className="flex items-center space-x-2 bg-black/30 px-3 py-2 rounded-lg border border-white/5">
+                  <div className="flex items-center space-x-2 bg-black/30 px-3 py-2 rounded-lg border border-white/5 flex-grow lg:flex-grow-0">
                     <Key className="w-4 h-4 text-gray-400" />
-                    <span className="text-xs text-gray-400">API Key:</span>
+                    <span className="text-xs text-gray-400 whitespace-nowrap">API Key (Optional):</span>
                     <input 
                       type="password" 
                       value={apiKey}
                       onChange={handleApiKeyChange}
-                      className="w-32 bg-transparent text-xs text-white focus:outline-none font-mono placeholder:text-gray-700"
+                      className="w-24 bg-transparent text-xs text-white focus:outline-none font-mono placeholder:text-gray-700"
                       placeholder="Gemini Key"
                     />
                   </div>
+                  
                   <Button 
                     onClick={handleAnalyze}
                     disabled={!code.trim() || state === 'ANALYZING' || state === 'OPTIMIZING'}
@@ -433,7 +478,7 @@ export default function AnalyzerPage() {
                     {state === 'ANALYZING' ? (
                       <div className="flex items-center"><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />Analyzing...</div>
                     ) : (
-                      <div className="flex items-center"><BarChart3 className="w-4 h-4 mr-2" />{state === 'IDLE' ? 'Analyze Gas Usage' : 'Re-Analyze'}</div>
+                      <div className="flex items-center justify-center"><BarChart3 className="w-4 h-4 mr-2" />{state === 'IDLE' ? 'Analyze' : 'Re-Analyze'}</div>
                     )}
                   </Button>
                 </div>

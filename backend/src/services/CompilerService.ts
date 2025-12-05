@@ -12,6 +12,9 @@ export type CompileResult = {
 
 export async function compileContract(userSource: string): Promise<CompileResult> {
 
+  // Strip markdown code blocks if present (common issue with AI output)
+  userSource = userSource.replace(/```solidity/g, "").replace(/```/g, "");
+
   const input = {
     language: "Solidity",
     sources: {
